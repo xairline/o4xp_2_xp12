@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-13, macos-latest]
+        os: [windows-latest, ubuntu-latest, macos-13]
     steps:
       - uses: actions/checkout@v3
 
@@ -24,28 +24,24 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build Executable
-        run: python -m PyInstaller --distpath o4xp_2_xp12/. --workpath ./OBJ --onefile o4xp_2_xp12.py
-
-      - name: Archive Build Results
-        if: startsWith(matrix.os, 'windows')
-        run: zip -r o4xp_2_xp12_windows.zip o4xp_2_xp12/*.exe
-
-      - name: Archive Build Results
-        if: startsWith(matrix.os, 'ubuntu')
-        run: zip -r o4xp_2_xp12_linux.zip o4xp_2_xp12/*.bin
-
-      - name: Archive Build Results
-        if: matrix.os == 'macos-13' || matrix.os == 'macos-latest'
-        run: zip -r o4xp_2_xp12_mac.zip o4xp_2_xp12/*.bin
+        env:
+          OS: ${{ matrix.os }}
+        shell: bash
+        run: |
+          python -m PyInstaller  --distpath o4xp_2_xp12/. --workpath ./OBJ --onefile o4xp_2_xp12.py
+          if [[ "$OS" = "windows-latest" ]]; then 
+              mv o4xp_2_xp12/o4xp_2_xp12.exe o4xp_2_xp12.exe; 
+          else
+              mv o4xp_2_xp12/o4xp_2_xp12 o4xp_2_xp12_$OS;
+          fi
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-build
           path: |
-            o4xp_2_xp12_windows.zip
-            o4xp_2_xp12_linux.zip
-            o4xp_2_xp12_mac.zip
+            o4xp_2_xp12_${{ matrix.os }}
+            o4xp_2_xp12.exe
 
   release:
     runs-on: ubuntu-latest
@@ -60,40 +56,10 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          files: |
+            ${{ github.workspace }}/build/windows-latest-build/o4xp_2_xp12.exe
+            ${{ github.workspace }}/build/ubuntu-latest-build/o4xp_2_xp12_ubuntu-latest
+            ${{ github.workspace }}/build/macos-13-build/o4xp_2_xp12_macos-13
           prerelease: ${{ contains(github.ref_name, '-') }}
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/o4xp_2_xp12_windows.zip
-          asset_name: o4xp_2_xp12_windows.zip
-          asset_content_type: application/zip
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/o4xp_2_xp12_linux.zip
-          asset_name: o4xp_2_xp12_linux.zip
-          asset_content_type: application/zip
-
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/o4xp_2_xp12_mac.zip
-          asset_name: o4xp_2_xp12_mac.zip
-          asset_content_type: application/zip
